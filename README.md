@@ -6,6 +6,7 @@
 
 <br>
 
+
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-4285F4?style=flat-square&logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/mv3/)
 [![Version](https://img.shields.io/badge/version-2.19.3-4c6ef5?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-3fbf6f?style=flat-square)](LICENSE)
