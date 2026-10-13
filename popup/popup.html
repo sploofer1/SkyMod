@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>SkyMod</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="popup.css">
+<script src="popup-size-early.js"></script>
+</head>
+<body>
+    <canvas id="pcb-canvas"></canvas>
+    <iframe id="builder-frame" src="sandbox.html" title="SkyMod конструктор" tabindex="-1"></iframe>
+
+    <div class="popup-content">
+        <header class="head">
+            <div class="logo"><span class="logo-sky">Sky</span><span class="logo-mod" id="mod-target">Mod</span></div>
+            <span class="head-version" id="versionLabel">v2.4.1</span>
+        </header>
+
+        <main class="panel" id="panel"></main>
+
+        <nav class="tabs" id="tabs" role="tablist"></nav>
+    </div>
+
+    <script src="../schedule-core.js"></script>
+    <script src="settings-io.js"></script>
+    <script src="../part-runtime.js"></script>
+    <script src="parts.js"></script>
+    <script src="popup.js"></script>
+</body>
+</html>

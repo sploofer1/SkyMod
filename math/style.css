@@ -1,0 +1,28 @@
+#skyeng-next-task-btn {
+  position: fixed;
+  top: 70px;
+  right: 20px;
+  z-index: 999999;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: #fff;
+  background: #2f80ed;
+  border: none;
+  border-radius: 24px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+#skyeng-next-task-btn:hover:not(:disabled) {
+  background: #1c64d1;
+  transform: translateY(-2px);
+}
+
+#skyeng-next-task-btn:disabled {
+  background: #9aa5b1;
+  cursor: default;
+  box-shadow: none;
+}

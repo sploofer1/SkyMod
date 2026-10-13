@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>SkyMod — Резервная копия настроек</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="builder.css">
+<style>
+    .backup-page { max-width: 560px; margin: 40px auto; padding: 0 20px; display: flex; flex-direction: column; gap: 16px; }
+    .backup-page h1 { font-size: 20px; margin: 0; }
+    .backup-page p { margin: 0; font-size: 13px; color: var(--text-muted); line-height: 1.55; }
+    .backup-card { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+    .backup-card h2 { margin: 0; font-size: 14px; text-transform: none; letter-spacing: normal; color: var(--text); }
+    .backup-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    #status { font-size: 12.5px; font-weight: 600; }
+    #status.ok { color: #3fbf6f; }
+    #status.err { color: #ff6b6b; }
+</style>
+</head>
+<body>
+    <header class="topbar">
+        <div class="brand"><span class="brand-sky">Sky</span><span class="brand-mod">Mod</span><span class="brand-sep">·</span>Резервная копия</div>
+    </header>
+    <main class="backup-page">
+        <section class="backup-card">
+            <h2>Экспорт</h2>
+            <p>Скачивает один файл со всеми настройками SkyMod: тема, карточки, попап, конструкторы, фон и части интерфейса сайта, пресеты.</p>
+            <div class="backup-row"><button type="button" class="primary-btn" id="export-btn">Скачать skymod-settings.json</button></div>
+        </section>
+        <section class="backup-card">
+            <h2>Импорт</h2>
+            <p>Выберите файл, который вы скачали раньше, затем отметьте, что именно применить. Остальные настройки останутся как есть.</p>
+            <div class="backup-row"><button type="button" class="side-btn" id="import-btn">Выбрать файл…</button></div>
+            <input type="file" id="import-input" accept="application/json,.json" hidden>
+            <div class="modal-list" id="category-list"></div>
+            <div class="backup-row" id="confirm-row" hidden>
+                <button type="button" class="primary-btn" id="confirm-btn">Импортировать выбранное</button>
+                <button type="button" class="side-btn" id="cancel-btn">Отмена</button>
+            </div>
+            <div id="status"></div>
+        </section>
+    </main>
+    <script src="settings-io.js"></script>
+    <script src="backup.js"></script>
+</body>
+</html>

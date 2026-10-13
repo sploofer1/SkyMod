@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>SkyMod — Конструктор</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="builder.css">
+</head>
+<body>
+    <header class="topbar">
+        <div class="brand"><span class="brand-sky">Sky</span><span class="brand-mod">Mod</span><span class="brand-sep">·</span>Конструктор</div>
+        <div class="topbar-right">
+            <span class="save-status" id="save-status" aria-live="polite">Сохранено</span>
+            <button type="button" class="tour-btn" id="tour-btn" title="Пройти быстрое обучение по конструктору">Обучение</button>
+            <a href="docs.html" target="_blank" class="topbar-link">Документация ↗</a>
+        </div>
+    </header>
+
+    <div class="mode-bar">
+        <div class="mode-switch">
+            <button type="button" class="mode-btn" data-mode="popup"><span class="mode-title">Попап</span><span class="mode-sub">окно расширения</span></button>
+            <button type="button" class="mode-btn" data-mode="site"><span class="mode-title">Сайт</span><span class="mode-sub">avatar.skyeng.ru</span></button>
+        </div>
+        <p class="mode-hint" id="mode-hint"></p>
+    </div>
+
+    <div class="status-bar" id="status-bar" aria-live="polite"></div>
+
+        <div class="layout" id="layout">
+        <aside class="sidebar">
+            <section class="side-block" data-scope="popup">
+                <h2>Пресеты конструктора</h2>
+                <div class="preset-list" id="preset-list"></div>
+                <button type="button" class="side-btn" id="preset-save">+ Сохранить текущее</button>
+            </section>
+
+            <section class="side-block" data-scope="popup">
+                <h2>Применение</h2>
+                <div class="side-row">
+                    <span>Включить конструктор</span>
+                    <label class="switch"><input type="checkbox" id="opt-enabled"><span class="switch-track"></span></label>
+                </div>
+                <div class="side-row-stack">
+                    <span>Слой</span>
+                    <select id="opt-layer">
+                        <option value="under">Под интерфейсом</option>
+                        <option value="over">Поверх всего</option>
+                    </select>
+                </div>
+                <div class="side-row-stack">
+                    <span>Область</span>
+                    <select id="opt-scope">
+                        <option value="full">Весь попап</option>
+                        <option value="header">Только шапка</option>
+                        <option value="panel">Только тело настроек</option>
+                    </select>
+                </div>
+                <div class="side-row">
+                    <span>Взаимодействие с курсором</span>
+                    <label class="switch"><input type="checkbox" id="opt-interactive"><span class="switch-track"></span></label>
+                </div>
+                <details class="side-details"><summary>Подробнее</summary><span class="side-hint">Со слоем "Под интерфейсом" фон получает движения и нажатия мыши (mousemove, mousedown, mouseup, click, mouseleave) в своём коде, а сам попап работает как обычно. Со слоем "Поверх всего" песочница получает мышь целиком (кнопки и поля в вашем HTML кликаются), но перекрывает интерфейс попапа.</span></details>
+            </section>
+
+            <section class="side-block" data-scope="popup">
+                <h2>Файл конструктора</h2>
+                <button type="button" class="side-btn" id="file-export">Экспорт в файл</button>
+                <button type="button" class="side-btn" id="file-import">Импорт из файла</button>
+                <input type="file" id="file-import-input" accept="application/json" hidden>
+                <span class="side-hint">Только код и настройки попап-конструктора (HTML/CSS/JS, слой, область, глобальный CSS). Для фона сайта — используйте "Все настройки SkyMod" ниже.</span>
+            </section>
+
+            <section class="side-block" data-scope="site" hidden>
+                <h2>Пресеты сайта</h2>
+                <div class="preset-list" id="site-preset-list"></div>
+                <button type="button" class="side-btn" id="site-preset-save">+ Сохранить текущее</button>
+                <span class="side-hint">В пресет входят фон сайта (HTML/CSS/JS, слой, курсор) и CSS частей интерфейса.</span>
+            </section>
+
+            <section class="side-block" data-scope="site" hidden>
+                <h2>Применение на сайте</h2>
+                <div class="side-row">
+                    <span>Включить на сайте</span>
+                    <label class="switch"><input type="checkbox" id="site-opt-enabled"><span class="switch-track"></span></label>
+                </div>
+                <div class="side-row-stack">
+                    <span>Слой</span>
+                    <select id="site-opt-layer">
+                        <option value="under">Под интерфейсом сайта (как фон)</option>
+                        <option value="over">Поверх всего сайта</option>
+                    </select>
+                </div>
+                <div class="side-row">
+                    <span>Взаимодействие с курсором</span>
+                    <label class="switch"><input type="checkbox" id="site-opt-interactive"><span class="switch-track"></span></label>
+                </div>
+                <details class="side-details"><summary>Подробнее</summary><span class="side-hint">Фон получает движения и нажатия мыши (mousemove, mousedown, mouseup, click, mouseleave) в своём коде — при любом слое, в том числе под интерфейсом. Сам сайт при этом работает как обычно: клики до него доходят. Кнопки и поля внутри самого фона при этом не кликаются — фон только следит за курсором.</span></details>
+                <span class="side-hint">Работает на настоящей вкладке avatar.skyeng.ru, пока она открыта — не только пока открыт попап. Применяется сразу на всех открытых вкладках сайта.</span>
+            </section>
+
+            <section class="side-block">
+                <h2>Все настройки SkyMod</h2>
+                <button type="button" class="side-btn" id="all-export">Экспорт всех настроек</button>
+                <button type="button" class="side-btn" id="all-import">Импорт всех настроек</button>
+                <input type="file" id="all-import-input" accept="application/json" hidden>
+                <span class="side-hint">Тема, карточки, задания, попап и оба конструктора (попап + сайт) разом.</span>
+            </section>
+        </aside>
+
+        <main class="main">
+            <section class="block" data-scope="popup">
+                <div class="block-head"><h2>Песочница попапа</h2></div>
+                <div class="editors">
+                    <div class="editor-row-top">
+                        <div class="editor-col">
+                            <label for="code-html">HTML</label>
+                            <textarea id="code-html" class="code-area" spellcheck="false" placeholder="&lt;canvas id=&quot;c&quot;&gt;&lt;/canvas&gt;"></textarea>
+                        </div>
+                        <div class="editor-col">
+                            <label for="code-css">CSS</label>
+                            <textarea id="code-css" class="code-area" spellcheck="false" placeholder="#c { width: 100%; height: 100%; }"></textarea>
+                        </div>
+                    </div>
+                    <div class="editor-col">
+                        <label for="code-js">JS</label>
+                        <textarea id="code-js" class="code-area code-area-tall" spellcheck="false" placeholder="// root, canvas, storage, theme — см. документацию"></textarea>
+                    </div>
+                </div>
+                <div class="examples-row">
+                    <select id="example-select"></select>
+                    <button type="button" class="side-btn" id="example-btn">Вставить пример</button>
+                </div>
+            </section>
+
+            <section class="block" data-scope="popup">
+                <div class="block-head">
+                    <h2>Глобальный CSS <span class="block-head-hint">— не песочница, применяется напрямую к реальному интерфейсу попапа</span></h2>
+                    <label class="switch"><input type="checkbox" id="opt-global-enabled"><span class="switch-track"></span></label>
+                </div>
+                <textarea id="code-global-css" class="code-area" spellcheck="false" placeholder=".tab-content.slide-from-right { animation: my-slide .4s ease; }"></textarea>
+            </section>
+
+            <div class="apply-row" data-scope="popup">
+                <button type="button" class="primary-btn" id="apply-btn">▶ Применить</button>
+                <span class="apply-hint">Предпросмотр справа обновляется сам, вскоре после того как вы перестанете печатать — либо сразу по этой кнопке или Ctrl/Cmd+Enter в любом поле кода. Tab/Shift+Tab там же — отступы, не переход к следующему полю.</span>
+            </div>
+
+            <section class="debug-grid" data-scope="popup">
+                <div class="block">
+                    <div class="block-head"><h2>Отладчик</h2></div>
+                    <div class="error-list" id="error-list"></div>
+                </div>
+                <div class="block">
+                    <div class="block-head"><h2>Консоль</h2></div>
+                    <div class="log-panel" id="log-panel"></div>
+                </div>
+            </section>
+
+            <section class="block" data-scope="site" hidden id="parts-block">
+                <div class="block-head"><h2>Части интерфейса сайта <span class="block-head-hint">— свой CSS для отдельных элементов настоящего сайта</span></h2></div>
+                <ol class="steps">
+                    <li><b>Выберите часть</b><span>сверьтесь со скриншотом</span></li>
+                    <li><b>Скопируйте промпт</b><span>и вставьте его в ИИ-чат</span></li>
+                    <li><b>Опишите, что хотите</b><span>например: «лазер — сделай розовым»</span></li>
+                    <li><b>Вставьте CSS из ответа</b><span>он сразу применится на сайте</span></li>
+                </ol>
+                <div class="parts-grid">
+                    <div class="parts-col">
+                        <select id="part-select"></select>
+                        <div class="part-info" id="part-info"></div>
+                    </div>
+                    <div class="parts-col">
+                        <div class="parts-editor-head">
+                            <span class="parts-editor-title">CSS этой части</span>
+                            <span class="parts-switch-label" id="part-state-label">Не применяется</span>
+                            <label class="switch"><input type="checkbox" id="part-enabled"><span class="switch-track"></span></label>
+                        </div>
+                        <label class="part-also" id="part-also-row" hidden><input type="checkbox" id="part-also"><span id="part-also-label"></span></label>
+                        <div class="part-also-hint" id="part-also-hint" hidden></div>
+                        <div class="part-tabs" id="part-tabs" hidden>
+                            <button type="button" class="part-tab active" data-tab="css">CSS</button>
+                            <button type="button" class="part-tab" data-tab="html">HTML</button>
+                            <button type="button" class="part-tab" data-tab="js">JS</button>
+                        </div>
+                        <textarea id="part-css" class="code-area" spellcheck="false" placeholder="[data-test=&quot;student schedule now marker&quot;] { background: ... !important; }"></textarea>
+                        <textarea id="part-html" class="code-area" spellcheck="false" hidden placeholder="&lt;i&gt;&lt;/i&gt;   подстановки: {{title}}, {{startLabel}}, {{minutesLeft}}"></textarea>
+                        <textarea id="part-js" class="code-area" spellcheck="false" hidden placeholder="api.onCards(cards => { cards.forEach(c => api.card(c.id).toggleClass('current', c.status === 'current')); });"></textarea>
+                        <div class="part-log" id="part-log" hidden>
+                            <div class="part-log-head"><span>Консоль поведения (берётся с открытой вкладки сайта)</span><button type="button" class="side-btn" id="part-log-clear">Очистить</button></div>
+                            <pre id="part-log-body"></pre>
+                        </div>
+                        <details class="part-behavior-help" id="part-behavior-help" hidden>
+                            <summary>Как работают вкладки HTML и JS</summary>
+                            <p>HTML это шаблон: он вставляется в каждый элемент части как <code>div.skymod-card-slot</code>. Подстановки <code>{{title}}</code>, <code>{{startLabel}}</code>, <code>{{progress}}</code> и другие поля элемента. Скрипты, <code>on*</code>-обработчики и внешние ссылки из шаблона вырезаются.</p>
+                            <p>JS это тело функции с аргументом <code>api</code>. Он выполняется в изолированной песочнице: DOM сайта ему недоступен, он только читает данные карточек (<code>api.onCards</code>, <code>api.onHover</code>, <code>api.onLeave</code>, <code>api.onClick</code>) и отдаёт команды: <code>api.card(id).addClass / removeClass / toggleClass / setVar / setData / setText</code>. Результат на элементе: класс <code>.skymod-is-имя</code>, переменная <code>var(--skymod-имя)</code>, атрибут <code>[data-skymod-имя]</code>, текст в слоте <code>[data-skymod-slot="имя"]</code>. Оформляйте их во вкладке CSS.</p>
+                            <p>Кнопка «Скопировать промпт для ИИ: HTML и JS» даёт ИИ полное описание API и ограничений. Ошибки и <code>api.log</code> показываются в консоли выше.</p>
+                        </details>
+                        <div class="examples-row">
+                            <button type="button" class="side-btn primary" id="part-copy-prompt">Скопировать промпт для ИИ</button>
+                            <button type="button" class="side-btn primary" id="part-copy-behavior-prompt" hidden>Скопировать промпт для ИИ: HTML и JS</button>
+                            <button type="button" class="side-btn" id="part-insert-example">Вставить пример</button>
+                            <a href="docs.html#parts" target="_blank" class="topbar-link">Как это работает ↗</a>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="block" data-scope="site" hidden>
+                <div class="block-head"><h2>Песочница фона сайта</h2></div>
+                <p class="side-hint">
+                    Сам сайт нельзя встроить сюда для полноценного предпросмотра
+                    "как в реальности" (чужой домен не пускает себя в чужой iframe) — ниже
+                    честный предпросмотр: та же песочница, тот же код, без интерфейса сайта
+                    вокруг. Чтобы увидеть эффект в реальном интерфейсе — держите вкладку
+                    сайта открытой рядом.
+                </p>
+                <div class="preview-wrap site-preview-wrap" id="site-preview-wrap">
+                    <iframe id="site-builder-frame" src="sandbox.html" title="Предпросмотр фона сайта"></iframe>
+                </div>
+                <div class="editors">
+                    <div class="editor-row-top">
+                        <div class="editor-col">
+                            <label for="site-code-html">HTML</label>
+                            <textarea id="site-code-html" class="code-area" spellcheck="false" placeholder="&lt;canvas id=&quot;c&quot;&gt;&lt;/canvas&gt;"></textarea>
+                        </div>
+                        <div class="editor-col">
+                            <label for="site-code-css">CSS</label>
+                            <textarea id="site-code-css" class="code-area" spellcheck="false" placeholder="#c { width: 100%; height: 100%; }"></textarea>
+                        </div>
+                    </div>
+                    <div class="editor-col">
+                        <label for="site-code-js">JS</label>
+                        <textarea id="site-code-js" class="code-area code-area-tall" spellcheck="false" placeholder="// root, canvas, storage, theme (theme.accent фиксированный), schedule — см. документацию"></textarea>
+                    </div>
+                </div>
+                <div class="examples-row">
+                    <select id="site-example-select"></select>
+                    <button type="button" class="side-btn" id="site-example-btn">Вставить пример</button>
+                    <button type="button" class="side-btn primary" id="site-copy-prompt">Скопировать промпт для ИИ</button>
+                    <a href="docs.html#prompts" target="_blank" class="topbar-link">База промптов ↗</a>
+                </div>
+            </section>
+
+            <div class="apply-row" data-scope="site" hidden>
+                <button type="button" class="primary-btn" id="site-apply-btn">▶ Применить</button>
+                <span class="apply-hint">Тоже сохраняется и перезапускается на debounce (или сразу по Ctrl/Cmd+Enter) — можно просто печатать, Tab там вставляет отступ.</span>
+            </div>
+
+            <section class="debug-grid" data-scope="site" hidden>
+                <div class="block">
+                    <div class="block-head"><h2>Отладчик (сайт)</h2></div>
+                    <div class="error-list" id="site-error-list"></div>
+                </div>
+                <div class="block">
+                    <div class="block-head"><h2>Консоль (сайт)</h2></div>
+                    <div class="log-panel" id="site-log-panel"></div>
+                </div>
+            </section>
+        </main>
+
+        <aside class="preview-col" data-scope="popup">
+            <div class="block-head">
+                <h2>Предпросмотр</h2>
+                <button type="button" class="side-btn small" id="preview-toggle">Скрыть</button>
+            </div>
+            <p class="side-hint">Настоящий попап, вживую — с вашим кодом поверх/под интерфейсом.</p>
+            <div class="preview-wrap" id="preview-wrap">
+                <iframe id="preview-frame" src="popup.html?builderPreview=1" title="Предпросмотр попапа"></iframe>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Модалка выбора категорий при импорте всех настроек -->
+    <div class="modal-backdrop" id="import-modal" hidden>
+        <div class="modal">
+            <h2>Что импортировать</h2>
+            <p class="modal-text">Отметьте, что применить из файла — остальное останется как есть в текущих настройках.</p>
+            <div class="modal-list" id="import-category-list"></div>
+            <div class="modal-actions">
+                <button type="button" class="side-btn" id="import-cancel">Отмена</button>
+                <button type="button" class="primary-btn" id="import-confirm">Импортировать выбранное</button>
+            </div>
+        </div>
+    </div>
+
+    <iframe id="builder-frame" src="sandbox.html" hidden title="SkyMod песочница (попап)"></iframe>
+    <script src="../schedule-core.js"></script>
+    <script src="settings-io.js"></script>
+    <script src="../part-runtime.js"></script>
+    <script src="parts.js"></script>
+    <script src="part-preview.js"></script>
+    <script src="builder-tour.js"></script>
+    <script src="builder.js"></script>
+</body>
+</html>

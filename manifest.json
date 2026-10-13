@@ -1,0 +1,97 @@
+{
+  "manifest_version": 3,
+  "name": "SkyMod",
+  "version": "2.19.3",
+  "description": "Кастомизация интерфейса avatar.skyeng.ru: цвета, шрифты, фон.",
+  "permissions": [
+    "alarms",
+    "declarativeNetRequest",
+    "scripting",
+    "storage",
+    "unlimitedStorage",
+    "webNavigation"
+  ],
+  "host_permissions": [
+    "https://avatar.skyeng.ru/*",
+    "https://api.telegram.org/*"
+  ],
+  "action": {
+    "default_popup": "popup/popup.html"
+  },
+  "sandbox": {
+    "pages": [
+      "popup/sandbox.html",
+      "popup/behavior-sandbox.html"
+    ]
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "popup/sandbox.html",
+        "popup/sandbox.js",
+        "popup/behavior-sandbox.html",
+        "popup/behavior-sandbox.js"
+      ],
+      "matches": [
+        "https://avatar.skyeng.ru/*"
+      ]
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://avatar.skyeng.ru/*"
+      ],
+      "js": [
+        "diag-hook.js",
+        "antilock.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://avatar.skyeng.ru/*"
+      ],
+      "js": [
+        "schedule-core.js",
+        "part-runtime.js",
+        "content.js"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://avatar.skyeng.ru/student/test-preparation/*"
+      ],
+      "js": [
+        "math/list-page.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://avatar.skyeng.ru/code/task/*"
+      ],
+      "js": [
+        "math/task-page.js"
+      ],
+      "css": [
+        "math/style.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "block_trackers",
+        "enabled": false,
+        "path": "rules/trackers.json"
+      }
+    ]
+  }
+}
