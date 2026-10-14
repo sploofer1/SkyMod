@@ -23,7 +23,7 @@
 
 | | | | |
 | :---: | :---: | :---: | :---: |
-| [![Установить](https://img.shields.io/badge/Установить-из_исходников-4c6ef5?style=for-the-badge&logo=googlechrome&logoColor=white)](#-установка) | [![Баг](https://img.shields.io/badge/Создать-bug_report-d9534f?style=for-the-badge&logo=github&logoColor=white)](https://github.com/sploofer1/SkyMod/issues/new?labels=bug) | [![Идея](https://img.shields.io/badge/Предложить-идею-3fbf6f?style=for-the-badge&logo=github&logoColor=white)](https://github.com/sploofer1/SkyMod/issues/new?labels=enhancement) | [![Changelog](https://img.shields.io/badge/История-изменений-8a8f98?style=for-the-badge)](CHANGELOG.md) |
+| [![Установить](https://img.shields.io/badge/Установить-из_исходников-4c6ef5?style=for-the-badge&logo=googlechrome&logoColor=white)](#-установка) | [![Баг](https://img.shields.io/badge/Создать-bug_report-d9534f?style=for-the-badge&logo=github&logoColor=white)]([https://github.com/sploofer1/SkyMod/issues/new?labels=bug](https://github.com/sploofer1/SkyMod/issues/new?template=bug_report.yml)) | [![Идея](https://img.shields.io/badge/Предложить-идею-3fbf6f?style=for-the-badge&logo=github&logoColor=white)](https://github.com/sploofer1/SkyMod/issues/new?labels=enhancement) | [![Changelog](https://img.shields.io/badge/История-изменений-8a8f98?style=for-the-badge)](CHANGELOG.md) |
 
 <!-- TODO: кнопки для Chrome Web Store (расширения там нет), Telegram-канала и Wiki. Добавьте, когда появятся.
      TODO: если в репозитории появятся .github/ISSUE_TEMPLATE/bug_report.yml и feature_request.yml,
