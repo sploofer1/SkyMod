@@ -767,3 +767,47 @@ html.ui-animated .tab-btn.active { background-size: 200% 200%; animation: skymod
 
 .diag-status { white-space: pre-line; }
 .diag-code { display: flex; align-items: center; gap: 8px; font-size: 12px; opacity: .85; }
+
+/* ============ Полоска «доступна новая версия» ============ */
+:root { --update-strip-h: 26px; }
+.update-strip {
+    box-sizing: border-box;
+    height: var(--update-strip-h);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 8px 0 16px;
+    border-top: 1px solid rgba(245, 158, 11, 0.35);
+    background: rgba(245, 158, 11, 0.12);
+    font-size: 12px;
+    font-weight: 600;
+}
+.update-strip[hidden] { display: none; }
+.update-strip-link {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #f59e0b;
+    text-decoration: none;
+}
+.update-strip-link:hover { text-decoration: underline; }
+.update-strip-close {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-muted-2);
+    font-family: inherit;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+}
+.update-strip-close:hover { background: rgba(255, 255, 255, 0.08); color: var(--text); }
+/* Полоска забирает свою высоту у панели, поэтому общая высота попапа не меняется:
+   в размере «xl» шапка, панель и вкладки и так упираются в предел 600px у попапов Chrome. */
+html.has-update-strip .panel { height: calc(var(--panel-h) - var(--update-strip-h)); }

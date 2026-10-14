@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SkyMod",
-  "version": "2.19.3",
+  "version": "2.21.0",
   "description": "Кастомизация интерфейса avatar.skyeng.ru: цвета, шрифты, фон.",
   "permissions": [
     "alarms",

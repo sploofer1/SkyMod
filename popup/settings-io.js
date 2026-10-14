@@ -46,7 +46,7 @@ const SETTINGS_CATEGORIES = [
     {
         id: 'siteUi', title: 'Элементы сайта',
         desc: 'Скрытие кнопки поддержки, аватарки, заголовка и меню; защита от блокировки при долгом отсутствии',
-        keys: ['hideSupportButton', 'hideUserTray', 'hidePageTitle', 'hideNavSections', 'hideBrandMark', 'antiLockEnabled', 'diagEnabled', 'diagBodies'],
+        keys: ['hideSupportButton', 'hideUserTray', 'hidePageTitle', 'hideNavSections', 'hideBrandMark', 'antiLockEnabled', 'updateCheckEnabled', 'diagEnabled', 'diagBodies'],
     },
     {
         id: 'telegram', title: 'Напоминания в Telegram',

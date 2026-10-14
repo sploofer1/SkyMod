@@ -268,6 +268,12 @@ const TABS = [
                 hint: 'Сайт открывает окно «Страница заскучала» и перезагружается, если час нет click, pointermove, focus и scroll. Расширение раз в 3 минуты подаёт сайту один сигнал активности и просит Chrome не выгружать вкладку из памяти.',
             },
 
+            { type: 'section', label: 'Обновления' },
+            {
+                key: 'updateCheckEnabled', type: 'toggle', label: 'Проверять обновления', default: true,
+                hint: 'Раз в сутки расширение запрашивает у GitHub страницу последнего релиза и, если вышла версия новее, показывает значок ↑ на иконке и полоску в попапе. Ничего не скачивается и не устанавливается, кроме самого запроса ничего не отправляется.',
+            },
+
             { type: 'section', label: 'Диагностика сайта' },
             {
                 key: 'diagEnabled', type: 'toggle', label: 'Вести журнал диагностики', default: true,
@@ -2698,6 +2704,79 @@ if (typeof ResizeObserver !== 'undefined') {
     }).observe(document.body);
 }
 
+// ---------- Подсказка о новой версии ----------
+// Данные кладёт background.js (раздел «Проверка новых версий»): здесь только
+// чтение storage, в сеть попап не ходит. Разбор версии продублирован из
+// background.js, общего подключаемого файла у них нет.
+
+const UPDATE_RELEASES_URL = 'https://github.com/sploofer1/SkyMod/releases';
+
+function updateParseVersion(tag) {
+    const m = /^v?(\d+(?:\.\d+){1,3})$/.exec(String(tag || '').trim());
+    return m ? m[1] : null;
+}
+
+function updateIsNewer(latest, current) {
+    const l = updateParseVersion(latest);
+    const c = updateParseVersion(current);
+    if (!l || !c) return false;
+    const pl = l.split('.').map(Number);
+    const pc = c.split('.').map(Number);
+    for (let i = 0; i < Math.max(pl.length, pc.length); i++) {
+        const d = (pl[i] || 0) - (pc[i] || 0);
+        if (d) return d > 0;
+    }
+    return false;
+}
+
+function hideUpdateStrip(strip) {
+    document.documentElement.classList.remove('has-update-strip');
+    strip.hidden = true;
+    strip.replaceChildren();
+}
+
+async function renderUpdateStrip() {
+    const strip = document.getElementById('update-strip');
+    if (!strip) return;
+    // В живом предпросмотре конструктора полоска не нужна.
+    if (previewForce) { hideUpdateStrip(strip); return; }
+    let version = '';
+    let url = UPDATE_RELEASES_URL;
+    let show = false;
+    try {
+        const r = await chrome.storage.local.get(['updateCheckEnabled', 'updateInfo', 'dismissedVersion']);
+        const info = r.updateInfo && typeof r.updateInfo === 'object' ? r.updateInfo : {};
+        version = typeof info.latestVersion === 'string' ? info.latestVersion : '';
+        show = r.updateCheckEnabled !== false
+            && updateIsNewer(version, chrome.runtime.getManifest().version)
+            && version !== r.dismissedVersion;
+        if (typeof info.releaseUrl === 'string' && info.releaseUrl.startsWith(UPDATE_RELEASES_URL + '/')) url = info.releaseUrl;
+    } catch (e) { show = false; }
+    if (!show) { hideUpdateStrip(strip); return; }
+
+    const link = document.createElement('a');
+    link.className = 'update-strip-link';
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.textContent = 'Доступна версия ' + version + ' — скачать';
+
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'update-strip-close';
+    close.title = 'Скрыть для этой версии';
+    close.setAttribute('aria-label', 'Скрыть');
+    close.textContent = '×';
+    close.addEventListener('click', () => {
+        hideUpdateStrip(strip);
+        try { chrome.storage.local.set({ dismissedVersion: version }); } catch (e) { /* расширение перезагрузили */ }
+    });
+
+    strip.replaceChildren(link, close);
+    strip.hidden = false;
+    document.documentElement.classList.add('has-update-strip');
+}
+
 // ---------- Старт ----------
 
 // ?tab=... — на что вкладку открыть при старте (используется, например,
@@ -2730,6 +2809,7 @@ async function init() {
     }
     activeTabId = initialTab;
 
+    await renderUpdateStrip();
     renderTabBar();
     renderPanel();
     initPCB();
@@ -2747,6 +2827,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
     let touchedBuilder = false;
     let touchedTheme = false;
     let touchedLocks = false;
+    let touchedUpdate = false;
     Object.keys(changes).forEach(key => {
         // BUILDER_STORAGE_PREFIX ("builderData:...") — это внутреннее
         // хранилище storage.get/set из ПОЛЬЗОВАТЕЛЬСКОГО JS в песочнице
@@ -2756,6 +2837,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
         // и она перезапускала сама себя на каждый storage.set (тот самый
         // пример "Счётчик кликов" рестартовался бы при каждом клике).
         if (key.startsWith(BUILDER_STORAGE_PREFIX)) return;
+        // Служебные данные проверки обновлений в currentValues (настройки) не нужны.
+        if (key === 'updateInfo' || key === 'dismissedVersion') { touchedUpdate = true; return; }
+        if (key === 'updateCheckEnabled') touchedUpdate = true;
         currentValues[key] = changes[key].newValue;
         if (key.startsWith('builder')) touchedBuilder = true;
         if (key === 'popupUiColor' || key === 'modColor' || key === 'pulseColor') touchedTheme = true;
@@ -2772,6 +2856,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
             panelEl.scrollTop = top;
         }
     }
+    if (touchedUpdate) renderUpdateStrip();
     if (touchedTheme) applyPopupTheme(currentValues);
     if (touchedBuilder) {
         applyBuilderLayer(currentValues);

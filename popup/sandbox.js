@@ -121,6 +121,47 @@ function applyScheduleData(data) {
     window.dispatchEvent(new CustomEvent('skymod-schedule', { detail: schedule }));
 }
 
+// Карточка занятия (или свой блок) под курсором на сайте. window.SKYMOD_CARD —
+// null, пока курсор не на карточке; на hover создаётся новый объект, на move
+// поля rect обновляются на месте, на leave снова null. Код фона должен читать
+// window.SKYMOD_CARD в каждом кадре, а не хранить ссылку. В попапе и в
+// предпросмотре конструктора сообщения не приходят — там всегда null.
+// Состояние не сбрасывается при повторном запуске кода: курсор от этого
+// никуда не делся.
+const CARD_EVENTS = ['hover', 'move', 'leave', 'click'];
+window.SKYMOD_CARD = null;
+
+function cleanCardMessage(data) {
+    if (!CARD_EVENTS.includes(data.event)) return null;
+    const r = data.rect;
+    if (!r || typeof r !== 'object') return null;
+    const rect = { x: r.x, y: r.y, w: r.w, h: r.h };
+    if (![rect.x, rect.y, rect.w, rect.h].every(v => typeof v === 'number' && Number.isFinite(v))) return null;
+    if (typeof data.id !== 'string' || !data.id) return null;
+    const color = typeof data.color === 'string' && /^#[0-9a-f]{6}$/i.test(data.color) ? data.color : null;
+    return { event: data.event, id: data.id.slice(0, 64), color, rect };
+}
+
+function applyCardMessage(data) {
+    const msg = cleanCardMessage(data);
+    if (!msg) return;
+    const card = window.SKYMOD_CARD;
+    const same = card && card.id === msg.id;
+    if (msg.event === 'hover' || (msg.event === 'move' && !same)) {
+        window.SKYMOD_CARD = { id: msg.id, color: msg.color, rect: Object.assign({}, msg.rect), since: Date.now() };
+    } else if (same && (msg.event === 'move' || msg.event === 'click')) {
+        Object.assign(card.rect, msg.rect);
+        card.color = msg.color;
+    } else if (same && msg.event === 'leave') {
+        window.SKYMOD_CARD = null;
+    }
+    // В detail — отдельная копия rect: слушатель может держать её у себя,
+    // а rect у SKYMOD_CARD дальше обновляется на месте.
+    window.dispatchEvent(new CustomEvent('skymod-card-rect', {
+        detail: { event: msg.event, id: msg.id, color: msg.color, rect: Object.assign({}, msg.rect) },
+    }));
+}
+
 function runUserCode(payload) {
     const { html = '', css = '', js = '', theme = {} } = payload || {};
 
@@ -193,6 +234,10 @@ window.addEventListener('message', (e) => {
     }
     if (data.type === 'skymod-pointer') {
         if (e.source === parent) dispatchForwardedPointer(data);
+        return;
+    }
+    if (data.type === 'skymod-card-rect') {
+        if (e.source === parent) applyCardMessage(data);
         return;
     }
     if (data.type === 'skymod-sandbox-run') {

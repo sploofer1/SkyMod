@@ -649,6 +649,7 @@ window.addEventListener('message', (e) => {
 
     if (data.type === 'skymod-sandbox-ready') {
         siteSandboxReady = true;
+        siteCardResend();
         if (sitePendingPayload) {
             postRunWhenSized(frame, sitePendingPayload);
             sitePendingPayload = null;
@@ -828,6 +829,151 @@ function setPointerForwarding(on) {
     if (!on && moveRaf) { cancelAnimationFrame(moveRaf); moveRaf = 0; pendingMove = null; }
 }
 
+// Карточки занятий и свои блоки: координаты для фона сайта.
+// Работает независимо от behaviorPointer (тот молчит без пользовательского JS
+// поведения) и от «Взаимодействия с курсором». Слушатели на документе общие
+// с поведением (см. initBehavior), здесь только логика. Состояние держим даже
+// пока песочница не готова: после skymod-sandbox-ready hovered-карточка
+// пересылается заново (siteCardResend).
+const SITE_CARD_THROTTLE_MS = 100;
+const SITE_CARD_SETTLE_MS = 300; // один пересчёт rect после hover: карточка могла сдвинуться CSS-анимацией
+let siteCardTrackingOn = false;
+let siteCardEl = null;
+let siteCardLast = null; // { id, color, rect } — то, что песочница видела в последний раз
+let siteCardTimer = 0;
+let siteCardSettleTimer = 0;
+let siteCardLastRun = 0;
+let siteCardScrollOn = false;
+
+function siteCardTarget(ev) {
+    const t = ev && ev.target;
+    if (!t || !t.closest) return null;
+    const parts = Object.keys(BEHAVIOR_PARTS);
+    for (let i = 0; i < parts.length; i++) {
+        const def = BEHAVIOR_PARTS[parts[i]];
+        const el = t.closest(def.itemSelector);
+        const id = el ? el.getAttribute(def.idAttr) : '';
+        if (el && id) return { el, partId: parts[i], id: String(id).slice(0, 64) };
+    }
+    return null;
+}
+
+function siteCardColor(el, partId, id) {
+    let color = null;
+    if (partId === 'custom-block') {
+        const block = customBlocksCache.find(b => b.id === id);
+        color = block ? block.color : null;
+    } else {
+        const subject = el.getAttribute('data-test-subject') || '';
+        color = subject ? skymodSubjectColor(subject, scheduleColors) : null;
+    }
+    return typeof color === 'string' && /^#[0-9a-f]{6}$/i.test(color) ? color : null;
+}
+
+function siteCardRect(el) {
+    const r = el.getBoundingClientRect();
+    const round = v => Math.round(v * 10) / 10;
+    return { x: round(r.left), y: round(r.top), w: round(r.width), h: round(r.height) };
+}
+
+function siteCardSameRect(a, b) {
+    return a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
+}
+
+function siteCardPost(event, info) {
+    const frame = getSiteBuilderFrame();
+    if (!frame || !frame.contentWindow || !siteSandboxReady) return;
+    frame.contentWindow.postMessage({
+        type: 'skymod-card-rect', event, id: info.id, color: info.color, rect: info.rect,
+    }, '*');
+}
+
+function siteCardListen(on) {
+    if (on === siteCardScrollOn) return;
+    siteCardScrollOn = on;
+    const method = on ? 'addEventListener' : 'removeEventListener';
+    // capture: scroll не всплывает, а сетка расписания может прокручиваться
+    // во внутреннем контейнере, а не на window.
+    window[method]('scroll', siteCardSchedule, { capture: true, passive: true });
+    window[method]('resize', siteCardSchedule, { passive: true });
+    if (!on && siteCardTimer) { clearTimeout(siteCardTimer); siteCardTimer = 0; }
+}
+
+function siteCardSchedule() {
+    if (siteCardTimer) return;
+    const wait = Math.max(0, SITE_CARD_THROTTLE_MS - (Date.now() - siteCardLastRun));
+    siteCardTimer = setTimeout(siteCardTick, wait);
+}
+
+function siteCardCheckRect() {
+    if (!siteCardEl || !siteCardLast) return;
+    if (!siteCardEl.isConnected) { siteCardLeave(); return; }
+    const rect = siteCardRect(siteCardEl);
+    if (siteCardSameRect(rect, siteCardLast.rect)) return;
+    siteCardLast.rect = rect;
+    siteCardPost('move', siteCardLast);
+}
+
+function siteCardTick() {
+    siteCardTimer = 0;
+    siteCardLastRun = Date.now();
+    siteCardCheckRect();
+}
+
+function siteCardEnter(target) {
+    siteCardEl = target.el;
+    siteCardLast = { id: target.id, color: siteCardColor(target.el, target.partId, target.id), rect: siteCardRect(target.el) };
+    siteCardPost('hover', siteCardLast);
+    siteCardListen(true);
+    // Если за 300 мс rect изменился (hover-анимация карточки), шлём move.
+    // Привязка к элементу: на другой карточке этот пересчёт уже не нужен.
+    const el = target.el;
+    siteCardSettleTimer = setTimeout(() => {
+        siteCardSettleTimer = 0;
+        if (siteCardEl === el) siteCardCheckRect();
+    }, SITE_CARD_SETTLE_MS);
+}
+
+function siteCardLeave() {
+    if (!siteCardEl || !siteCardLast) return;
+    // Карточку могли убрать из DOM — тогда отдаём последний известный rect.
+    if (siteCardEl.isConnected) siteCardLast.rect = siteCardRect(siteCardEl);
+    const info = siteCardLast;
+    siteCardEl = null;
+    siteCardLast = null;
+    if (siteCardSettleTimer) { clearTimeout(siteCardSettleTimer); siteCardSettleTimer = 0; }
+    siteCardListen(false);
+    siteCardPost('leave', info);
+}
+
+function siteCardResend() {
+    if (!siteCardEl || !siteCardLast) return;
+    if (!siteCardEl.isConnected) { siteCardLeave(); return; }
+    siteCardLast.rect = siteCardRect(siteCardEl);
+    siteCardPost('hover', siteCardLast);
+}
+
+function siteCardPointer(kind, ev) {
+    if (!siteCardTrackingOn) return;
+    if (kind === 'click') {
+        const target = siteCardTarget(ev);
+        if (!target) return;
+        const info = { id: target.id, color: siteCardColor(target.el, target.partId, target.id), rect: siteCardRect(target.el) };
+        siteCardPost('click', info);
+        return;
+    }
+    const target = kind === 'leave-window' ? null : siteCardTarget(ev);
+    if ((target ? target.el : null) === siteCardEl) return;
+    siteCardLeave();
+    if (target) siteCardEnter(target);
+}
+
+function setSiteCardTracking(on) {
+    if (on === siteCardTrackingOn) return;
+    siteCardTrackingOn = on;
+    if (!on) siteCardLeave();
+}
+
 function applySiteBuilderFrame(settings) {
     let frame = getSiteBuilderFrame();
 
@@ -837,6 +983,7 @@ function applySiteBuilderFrame(settings) {
         sitePendingPayload = null;
         setOpaqueShellHandling(false);
         setPointerForwarding(false);
+        setSiteCardTracking(false);
         return;
     }
 
@@ -874,6 +1021,8 @@ function applySiteBuilderFrame(settings) {
     // mousemove/mousedown/mouseup/click/mouseleave, а сайт работает как обычно.
     frame.style.pointerEvents = 'none';
     setPointerForwarding(!!settings.siteBuilderInteractive);
+    // Координаты карточек нужны только если у фона есть пользовательский JS.
+    setSiteCardTracking(!!String(settings.siteBuilderJs || '').trim());
 
     sendSiteBuilderCode(settings);
 }
@@ -2031,9 +2180,9 @@ window.addEventListener('message', ev => {
 });
 
 function initBehavior() {
-    document.addEventListener('mouseover', ev => behaviorPointer('hover', ev), true);
-    document.addEventListener('click', ev => behaviorPointer('click', ev), true);
-    document.documentElement.addEventListener('mouseleave', ev => behaviorPointer('leave-window', ev));
+    document.addEventListener('mouseover', ev => { behaviorPointer('hover', ev); siteCardPointer('hover', ev); }, true);
+    document.addEventListener('click', ev => { behaviorPointer('click', ev); siteCardPointer('click', ev); }, true);
+    document.documentElement.addEventListener('mouseleave', ev => { behaviorPointer('leave-window', ev); siteCardPointer('leave-window', ev); });
     setInterval(() => scheduleBehaviorTick(0), 15000);
 }
 

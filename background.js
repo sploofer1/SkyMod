@@ -260,3 +260,146 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     })().catch(e => sendResponse({ ok: false, error: String(e) }));
     return true;
 });
+
+// ---------- 4. Проверка новых версий через GitHub ----------
+// Только проверка и подсказка: расширение ничего не скачивает и не ставит.
+// Единственный сетевой запрос — GET releases/latest репозитория проекта.
+// Результат лежит в chrome.storage.local под ключом updateInfo:
+// { latestVersion, releaseUrl, checkedAt, isNewer, lastError? }.
+// Попап ничего не ждёт: показывает полоску по данным из storage.
+
+const UPDATE_ALARM = 'skymod-update-check';
+const UPDATE_API_URL = 'https://api.github.com/repos/sploofer1/SkyMod/releases/latest';
+const UPDATE_RELEASES_URL = 'https://github.com/sploofer1/SkyMod/releases';
+const UPDATE_MIN_INTERVAL_MS = 12 * 60 * 60 * 1000;
+const UPDATE_TIMEOUT_MS = 10000;
+const UPDATE_BADGE_COLOR = '#f59e0b';
+let updateCheckPromise = null;
+
+// 'v2.21.0' -> '2.21.0'; всё, что не похоже на версию, -> null.
+function updateParseVersion(tag) {
+    const m = /^v?(\d+(?:\.\d+){1,3})$/.exec(String(tag || '').trim());
+    return m ? m[1] : null;
+}
+
+function updateIsNewer(latest, current) {
+    const l = updateParseVersion(latest);
+    const c = updateParseVersion(current);
+    if (!l || !c) return false;
+    const pl = l.split('.').map(Number);
+    const pc = c.split('.').map(Number);
+    for (let i = 0; i < Math.max(pl.length, pc.length); i++) {
+        const d = (pl[i] || 0) - (pc[i] || 0);
+        if (d) return d > 0;
+    }
+    return false;
+}
+
+// Ответ сети — недоверенные данные: ссылку принимаем только на релизы нашего репозитория.
+function updateSafeReleaseUrl(url) {
+    return typeof url === 'string' && url.length < 300 && url.startsWith(UPDATE_RELEASES_URL + '/') ? url : UPDATE_RELEASES_URL;
+}
+
+function ensureUpdateAlarm() {
+    chrome.alarms.get(UPDATE_ALARM, alarm => {
+        if (!alarm) chrome.alarms.create(UPDATE_ALARM, { periodInMinutes: 1440 });
+    });
+}
+
+// Бейдж не переживает перезапуск браузера, поэтому его всегда можно
+// восстановить из кэша, без сети. isNewer сверяем с текущей версией заново:
+// после ручного обновления расширения кэш может ещё говорить «есть новее».
+async function updateApplyBadge() {
+    const { updateCheckEnabled, updateInfo, dismissedVersion } = await chrome.storage.local.get(['updateCheckEnabled', 'updateInfo', 'dismissedVersion']);
+    const info = updateInfo && typeof updateInfo === 'object' ? updateInfo : {};
+    const show = updateCheckEnabled !== false
+        && updateIsNewer(info.latestVersion, chrome.runtime.getManifest().version)
+        && info.latestVersion !== dismissedVersion;
+    chrome.action.setBadgeText({ text: show ? '\u2191' : '' });
+    if (show) chrome.action.setBadgeBackgroundColor({ color: UPDATE_BADGE_COLOR });
+}
+
+async function updateRecomputeCached() {
+    const { updateInfo } = await chrome.storage.local.get(['updateInfo']);
+    if (!updateInfo || typeof updateInfo !== 'object') return;
+    const isNewer = updateIsNewer(updateInfo.latestVersion, chrome.runtime.getManifest().version);
+    if (updateInfo.isNewer !== isNewer) await chrome.storage.local.set({ updateInfo: { ...updateInfo, isNewer } });
+}
+
+async function updateCheckRun() {
+    const { updateCheckEnabled, updateInfo } = await chrome.storage.local.get(['updateCheckEnabled', 'updateInfo']);
+    if (updateCheckEnabled === false) { await updateApplyBadge(); return; }
+
+    const prev = updateInfo && typeof updateInfo === 'object' ? updateInfo : null;
+    const now = Date.now();
+    // Не чаще раза в 12 часов. Отрицательный возраст (часы переведены назад) считаем устаревшим кэшем.
+    const age = prev && Number.isFinite(prev.checkedAt) ? now - prev.checkedAt : -1;
+    if (age >= 0 && age < UPDATE_MIN_INTERVAL_MS) { await updateApplyBadge(); return; }
+
+    const next = {
+        latestVersion: prev && typeof prev.latestVersion === 'string' ? prev.latestVersion : '',
+        releaseUrl: prev && typeof prev.releaseUrl === 'string' ? prev.releaseUrl : '',
+        checkedAt: now,
+        isNewer: false,
+    };
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), UPDATE_TIMEOUT_MS);
+    try {
+        const res = await fetch(UPDATE_API_URL, {
+            headers: { Accept: 'application/vnd.github+json' },
+            cache: 'no-store',
+            signal: controller.signal,
+        });
+        if (res.status === 404) {
+            // Релизов ещё нет: это не ошибка.
+            next.latestVersion = '';
+            next.releaseUrl = '';
+        } else if (!res.ok) {
+            throw new Error('HTTP ' + res.status);
+        } else {
+            const data = await res.json();
+            const version = updateParseVersion(data && data.tag_name);
+            if (!version) throw new Error('непонятный tag_name');
+            next.latestVersion = version;
+            next.releaseUrl = updateSafeReleaseUrl(data.html_url);
+        }
+    } catch (e) {
+        // Сеть, лимит GitHub, мусор в ответе: прежние данные остаются, checkedAt сдвигаем,
+        // чтобы не долбить сеть при каждом старте.
+        next.lastError = String((e && e.message) || e).slice(0, 200);
+    } finally {
+        clearTimeout(timer);
+    }
+    next.isNewer = updateIsNewer(next.latestVersion, chrome.runtime.getManifest().version);
+    await chrome.storage.local.set({ updateInfo: next });
+    await updateApplyBadge();
+}
+
+// Несколько триггеров подряд (старт, установка, будильник) дают один запрос.
+function updateCheck() {
+    if (updateCheckPromise) return updateCheckPromise;
+    updateCheckPromise = updateCheckRun()
+        .catch(e => console.warn('[SkyMod] проверка обновлений:', e))
+        .finally(() => { updateCheckPromise = null; });
+    return updateCheckPromise;
+}
+
+ensureUpdateAlarm();
+chrome.runtime.onInstalled.addListener(async () => {
+    ensureUpdateAlarm();
+    try { await updateRecomputeCached(); } catch (e) { /* кэш не критичен */ }
+    updateApplyBadge();
+    updateCheck();
+});
+chrome.runtime.onStartup.addListener(() => {
+    ensureUpdateAlarm();
+    updateApplyBadge();
+    updateCheck();
+});
+chrome.alarms.onAlarm.addListener(alarm => { if (alarm.name === UPDATE_ALARM) updateCheck(); });
+chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local') return;
+    // Опцию включили: проверка (с учётом кэша); выключили: проверка сама снимет бейдж.
+    if (changes.updateCheckEnabled) updateCheck();
+    if (changes.updateCheckEnabled || changes.updateInfo || changes.dismissedVersion) updateApplyBadge();
+});
