@@ -440,4 +440,6 @@ SkyMod не связан со Skyeng, Skypro и Sky Group, не одобрен �
 
 Если зашло, поставьте звезду репозиторию.
 
+[![Star History Chart](https://api.star-history.com/svg?repos=sploofer1/SkyMod&type=date&theme=dark)](https://star-history.com/#sploofer1/SkyMod&type=date)
+
 </div>
