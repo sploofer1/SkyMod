@@ -1,0 +1,45 @@
+name: 💡 Идея
+description: Предложить новую возможность или улучшение
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Хорошая идея начинается со сценария: что ты делаешь сейчас, что хочется, зачем.
+
+  - type: textarea
+    id: scenario
+    attributes:
+      label: Сценарий
+      description: Что ты делаешь сейчас, что неудобно, что хотелось бы вместо этого.
+      placeholder: |
+        Сейчас: каждую пятницу смотрю расписание на неделю вперёд.
+        Хочется: скрыть предметы, которые уже закончились.
+        Зачем: чтобы не прокручивать весь список глазами.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Как это могло бы выглядеть
+      description: Необязательно. Можно описать словами или приложить набросок.
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Альтернативы
+      description: Как ты обходишься сейчас? Что пробовал?
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Чек-лист
+      options:
+        - label: Проверил, что такой идеи ещё нет в открытых issue
+          required: true
