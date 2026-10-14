@@ -1,0 +1,77 @@
+name: 🐞 Баг
+description: Что-то работает не так, как ожидалось
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Спасибо, что нашёл время на баг-репорт. Заполни, пожалуйста, поля — по ним разбор идёт в разы быстрее.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: Что случилось
+      description: Опиши коротко, что не работает.
+      placeholder: Нажал на карточку занятия — попап не открылся.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Шаги воспроизведения
+      description: Последовательность, при которой баг повторяется.
+      placeholder: |
+        1. Открываю расписание
+        2. Навожу на карточку «Математика»
+        3. Кликаю — ничего не происходит
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Что ожидал
+      placeholder: Должно открыться окно занятия с домашками.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Версия расширения
+      description: Видно в chrome://extensions/ на карточке SkyMod
+      placeholder: 2.21.0
+    validations:
+      required: true
+
+  - type: input
+    id: browser
+    attributes:
+      label: Браузер и его версия
+      placeholder: Chrome 154.0.0.0
+    validations:
+      required: true
+
+  - type: textarea
+    id: diag
+    attributes:
+      label: Диагностический снимок
+      description: Попап → Удобство → Диагностика → Скачать снимок. Перетащи файл сюда.
+      placeholder: |
+        Перетащи JSON-файл сюда, или напиши «снимка нет».
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Чек-лист
+      options:
+        - label: Проверил, что расширение включено в chrome://extensions/
+          required: true
+        - label: Обновил вкладку сайта (F5) и попробовал снова
+          required: true
+        - label: Искал похожие issue в списке
+          required: true
