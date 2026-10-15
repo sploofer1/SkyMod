@@ -403,3 +403,12 @@ chrome.storage.onChanged.addListener((changes, area) => {
     if (changes.updateCheckEnabled) updateCheck();
     if (changes.updateCheckEnabled || changes.updateInfo || changes.dismissedVersion) updateApplyBadge();
 });
+
+// ---------- 5. Безопасный режим на тестах: сообщить вкладке о смене адреса ----------
+// Angular меняет адрес без перезагрузки, а content script в изолированном мире вызовов
+// history.pushState не видит. Поэтому сообщаем ему сами: в сообщении нет данных, вкладка
+// пересчитывает режим по своему location.pathname.
+chrome.webNavigation.onHistoryStateUpdated.addListener(details => {
+    if (details.frameId !== 0) return;
+    chrome.tabs.sendMessage(details.tabId, { type: 'skymod-url-changed' }, { frameId: 0 }).catch(() => {});
+}, { url: [{ hostEquals: 'avatar.skyeng.ru' }] });

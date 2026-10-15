@@ -41,6 +41,27 @@ const FIT_MAP = {
 let lastSettings = {};
 let isReapplyingRoot = false; // защита от бесконечного цикла (см. ниже)
 
+// ---------- Безопасный режим на страницах тестов ----------
+// На /code/test/* у сайта работает антифрод, поэтому расширение там молчит: ничего не
+// применяет, не создаёт и не слушает. Решает одна функция, syncSafeMode (перед applyAll).
+// Снимается только своё: по точным id, именам свойств, классов и атрибутов. Чужие элементы,
+// стили и обработчики не трогаем, глобальные объекты не патчим, событий на window и
+// document не диспатчим.
+const SAFE_PATH_RE = /^\/code\/test(\/|$)/;
+let safeToggle = true; // «Безопасный режим на тестах»; пока настройки не прочитаны, включён
+let safeMode = SAFE_PATH_RE.test(location.pathname);
+// MAIN-скрипт antilock.js считает себя включённым при любом значении, кроме '0',
+// поэтому на странице теста ставим '0' сразу, до чтения настроек.
+if (safeMode) document.documentElement.setAttribute('data-skymod-antilock', '0');
+
+// Всё, что расширение вешает на страницу (наблюдатели, интервалы, слушатели),
+// регистрируется парой «запустить/остановить»: безопасный режим снимает это одним
+// вызовом, а при выходе из него всё возвращается.
+const pageWatchers = [];
+function registerWatcher(start, stop) { pageWatchers.push({ start, stop, on: false }); }
+function startPageWatchers() { pageWatchers.forEach(w => { if (!w.on) { w.on = true; w.start(); } }); }
+function stopPageWatchers() { pageWatchers.forEach(w => { if (w.on) { w.on = false; w.stop(); } }); }
+
 // ---------- Цвет-или-градиент: общая модель для primaryColor/cardColor ----------
 // Хранится как объект { mode, solid, gradientType, angle, stops, custom }.
 // mode: 'solid' | 'gradient' | 'rgb' (анимированная радуга) | 'custom' (сырой
@@ -178,7 +199,10 @@ const rootStyleObserver = new MutationObserver(() => {
     }
     Promise.resolve().then(() => { isReapplyingRoot = false; });
 });
-rootStyleObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['style'] });
+registerWatcher(
+    () => rootStyleObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['style'] }),
+    () => rootStyleObserver.disconnect()
+);
 
 // ---------- Шрифт ----------
 
@@ -485,7 +509,7 @@ body {
     ];
     // Окно «The page got bored while you were away»: сайт блокирует себя после долгого
     // отсутствия и просит обновить страницу. Пока включена защита от блокировки,
-    // окно не показываем; страницу при необходимости обновляет watchWaitingPopup().
+    // окно не показываем; страницу при необходимости обновляет startWaitingWatch().
     if (settings.antiLockEnabled !== false) {
         const WAIT = '.cdk-overlay-container:has(laboratory-waiting-popup)';
         css += `${boost(`${WAIT} .cdk-global-overlay-wrapper, ${WAIT} laboratory-waiting-popup`)} { display: none !important; }\n`;
@@ -604,8 +628,17 @@ const headObserver = new MutationObserver(() => {
 function watchHead() {
     headObserver.observe(document.head || document.documentElement, { childList: true });
 }
-if (document.head) watchHead();
-else document.addEventListener('DOMContentLoaded', watchHead, { once: true });
+function onHeadReady() { if (!safeMode) watchHead(); }
+registerWatcher(
+    () => {
+        if (document.head) watchHead();
+        else document.addEventListener('DOMContentLoaded', onHeadReady, { once: true });
+    },
+    () => {
+        headObserver.disconnect();
+        document.removeEventListener('DOMContentLoaded', onHeadReady);
+    }
+);
 
 // ---------- Свой canvas/JS-фон сайта (конструктор → "Фон сайта") ----------
 // То же самое, что overlay в попапе (см. popup.js/builder.js), только
@@ -832,7 +865,7 @@ function setPointerForwarding(on) {
 // Карточки занятий и свои блоки: координаты для фона сайта.
 // Работает независимо от behaviorPointer (тот молчит без пользовательского JS
 // поведения) и от «Взаимодействия с курсором». Слушатели на документе общие
-// с поведением (см. initBehavior), здесь только логика. Состояние держим даже
+// с поведением (см. startBehavior), здесь только логика. Состояние держим даже
 // пока песочница не готова: после skymod-sandbox-ready hovered-карточка
 // пересылается заново (siteCardResend).
 const SITE_CARD_THROTTLE_MS = 100;
@@ -1041,7 +1074,7 @@ const SETTINGS_KEYS = [
     'scheduleCardColors', 'scheduleGlow', 'scheduleGlowStrength', 'scheduleSubjectColors',
     'lessonPopupCustomize', 'lessonPopupBackdropBlur', 'lessonPopupBackdropDim',
     'lessonPopupPanelEnabled', 'lessonPopupPanelColor', 'lessonPopupPanelOpacity',
-    'hideSupportButton', 'hideUserTray', 'hidePageTitle', 'hideNavSections', 'hideBrandMark', 'antiLockEnabled',
+    'hideSupportButton', 'hideUserTray', 'hidePageTitle', 'hideNavSections', 'hideBrandMark', 'antiLockEnabled', 'safeModeOnTests',
     'uiFadeIdleEnabled', 'uiFadeIdleSeconds', 'uiFadeHotkeyEnabled', 'uiFadeHotkey', 'uiFadeVisibility', 'uiFadeScope',
 ];
 
@@ -1400,6 +1433,7 @@ function updateWeekCache(dom, today) {
 
 // fromDom=false: только пересчитать "сейчас" по тому, что уже известно.
 function refreshSchedule(fromDom) {
+    if (safeMode) return;
     const now = Date.now();
     const today = skymodLocalDateKey(now);
 
@@ -1431,7 +1465,7 @@ function refreshSchedule(fromDom) {
 }
 
 function scheduleDomChanged() {
-    if (scheduleDomThrottle) return;
+    if (safeMode || scheduleDomThrottle) return;
     scheduleDomThrottle = setTimeout(() => {
         scheduleDomThrottle = 0;
         if (onSchedulePage()) refreshSchedule(true);
@@ -1571,6 +1605,7 @@ function buildCustomBlockEl(block, col, grid) {
 // Идемпотентно: у каждой колонки хранится подпись того, что в неё вставлено,
 // поэтому повторный вызов без изменений ничего не трогает (и не будит наблюдатель).
 function renderCustomBlocks() {
+    if (safeMode) return;
     const cols = document.querySelectorAll('.day-col[data-test-date]');
     if (!cols.length) return;
     ensureCustomBlocksStyle();
@@ -1592,15 +1627,29 @@ function renderCustomBlocks() {
     });
 }
 
-function initCustomBlocks() {
+let customBlocksTimer = 0;
+let customBlocksObserver = null;
+
+function customBlocksSchedule() {
+    clearTimeout(customBlocksTimer);
+    customBlocksTimer = setTimeout(() => { renderCustomBlocks(); scheduleBehaviorTick(0); }, 150);
+}
+
+function startCustomBlocks() {
     chrome.storage.local.get(CUSTOM_BLOCKS_KEY, r => {
         customBlocksCache = normalizeCustomBlocks(r[CUSTOM_BLOCKS_KEY]);
         renderCustomBlocks();
     });
-    let timer = 0;
-    const schedule = () => { clearTimeout(timer); timer = setTimeout(() => { renderCustomBlocks(); scheduleBehaviorTick(0); }, 150); };
-    new MutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
-    window.addEventListener('resize', schedule);
+    customBlocksObserver = new MutationObserver(customBlocksSchedule);
+    customBlocksObserver.observe(document.documentElement, { childList: true, subtree: true });
+    window.addEventListener('resize', customBlocksSchedule);
+}
+
+function stopCustomBlocks() {
+    if (customBlocksObserver) { customBlocksObserver.disconnect(); customBlocksObserver = null; }
+    window.removeEventListener('resize', customBlocksSchedule);
+    clearTimeout(customBlocksTimer);
+    customBlocksTimer = 0;
 }
 
 // Диагностика сайта. diag-hook.js (мир страницы) присылает журнал сообщениями
@@ -1667,6 +1716,7 @@ function persistDiag() {
 }
 
 window.addEventListener('message', ev => {
+    if (safeMode) return;
     if (ev.source !== window || !ev.data || ev.data.__skymodDiag !== 1) return;
     const d = ev.data;
     if (Array.isArray(d.entries) && d.entries.length) {
@@ -1692,6 +1742,15 @@ function initDiag() {
         diagIncidents = Array.isArray(r[DIAG_INCIDENTS_KEY]) ? r[DIAG_INCIDENTS_KEY] : [];
         scheduleDiagPersist();
     });
+}
+
+// Журнал начинается один раз за жизнь страницы: на странице теста он не стартует,
+// а после выхода из безопасного режима стартует с этого момента.
+let diagStarted = false;
+function startDiag() {
+    if (diagStarted) return;
+    diagStarted = true;
+    initDiag();
 }
 
 function diagRealVisibility() {
@@ -1924,6 +1983,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return;
     }
     if (msg.type === 'skymod-diag-snapshot') {
+        if (safeMode) { sendResponse({ ok: false, error: 'На странице теста диагностика отключена (безопасный режим).' }); return; }
         const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
         buildDiagSnapshot({ includeCode: !!msg.includeCode })
             .then(snap => downloadDiagFile(JSON.stringify(snap), `skymod-diag-${stamp}.json`, !!msg.includeCode))
@@ -2179,11 +2239,26 @@ window.addEventListener('message', ev => {
     }
 });
 
-function initBehavior() {
-    document.addEventListener('mouseover', ev => { behaviorPointer('hover', ev); siteCardPointer('hover', ev); }, true);
-    document.addEventListener('click', ev => { behaviorPointer('click', ev); siteCardPointer('click', ev); }, true);
-    document.documentElement.addEventListener('mouseleave', ev => { behaviorPointer('leave-window', ev); siteCardPointer('leave-window', ev); });
-    setInterval(() => scheduleBehaviorTick(0), 15000);
+const onBehaviorOver = ev => { behaviorPointer('hover', ev); siteCardPointer('hover', ev); };
+const onBehaviorClick = ev => { behaviorPointer('click', ev); siteCardPointer('click', ev); };
+const onBehaviorLeave = ev => { behaviorPointer('leave-window', ev); siteCardPointer('leave-window', ev); };
+let behaviorIntervalId = 0;
+
+function startBehavior() {
+    document.addEventListener('mouseover', onBehaviorOver, true);
+    document.addEventListener('click', onBehaviorClick, true);
+    document.documentElement.addEventListener('mouseleave', onBehaviorLeave);
+    behaviorIntervalId = setInterval(() => scheduleBehaviorTick(0), 15000);
+}
+
+function stopBehavior() {
+    document.removeEventListener('mouseover', onBehaviorOver, true);
+    document.removeEventListener('click', onBehaviorClick, true);
+    document.documentElement.removeEventListener('mouseleave', onBehaviorLeave);
+    clearInterval(behaviorIntervalId);
+    behaviorIntervalId = 0;
+    clearTimeout(behaviorTimer);
+    behaviorTimer = 0;
 }
 
 // Сайт при долгом отсутствии показывает laboratory-waiting-popup и ждёт нажатия
@@ -2195,6 +2270,7 @@ const WAIT_POPUP_COOLDOWN_MS = 10 * 60 * 1000;
 const WAIT_POPUP_STAMP_KEY = 'skymod-wait-popup-click';
 
 function handleWaitingPopup() {
+    if (safeMode) return;
     const popup = document.querySelector('laboratory-waiting-popup');
     if (popup && !diagIncidentOpen) { diagIncidentOpen = true; recordLockIncident(popup); }
     else if (!popup) diagIncidentOpen = false;
@@ -2210,20 +2286,30 @@ function handleWaitingPopup() {
     setTimeout(() => { if (document.querySelector('laboratory-waiting-popup')) button.click(); }, 1500);
 }
 
-function watchWaitingPopup() {
-    let queued = false;
-    const observer = new MutationObserver(() => {
-        if (queued) return;
-        queued = true;
-        setTimeout(() => { queued = false; handleWaitingPopup(); }, 300);
+let waitingObserver = null;
+let waitingQueued = false;
+
+function startWaitingWatch() {
+    waitingObserver = new MutationObserver(() => {
+        if (waitingQueued) return;
+        waitingQueued = true;
+        setTimeout(() => { waitingQueued = false; handleWaitingPopup(); }, 300);
     });
-    observer.observe(document.documentElement, { childList: true, subtree: true });
+    waitingObserver.observe(document.documentElement, { childList: true, subtree: true });
     document.addEventListener('visibilitychange', handleWaitingPopup);
 }
 
-if (document.documentElement) watchWaitingPopup();
+function stopWaitingWatch() {
+    if (waitingObserver) { waitingObserver.disconnect(); waitingObserver = null; }
+    document.removeEventListener('visibilitychange', handleWaitingPopup);
+}
 
-function initScheduleTracking() {
+registerWatcher(startWaitingWatch, stopWaitingWatch);
+
+let scheduleIntervalId = 0;
+let scheduleObserver = null;
+
+function startScheduleTracking() {
     chrome.storage.local.get([SKYMOD_SCHEDULE_CACHE_KEY, WEEK_LESSONS_KEY], r => {
         scheduleCache = r[SKYMOD_SCHEDULE_CACHE_KEY] || null;
         weekLessonsCache = r[WEEK_LESSONS_KEY] && typeof r[WEEK_LESSONS_KEY] === 'object' ? r[WEEK_LESSONS_KEY] : {};
@@ -2231,15 +2317,94 @@ function initScheduleTracking() {
         scheduleCacheLoaded = true;
         refreshSchedule(onSchedulePage());
     });
-    setInterval(() => refreshSchedule(onSchedulePage()), SCHEDULE_REFRESH_MS);
+    scheduleIntervalId = setInterval(() => refreshSchedule(onSchedulePage()), SCHEDULE_REFRESH_MS);
     // Angular дорисовывает карточки уже после загрузки, а при переходах по
     // сайту страница расписания появляется без перезагрузки: следим за
     // DOM, но каждое изменение только взводит таймер (дёшево).
-    new MutationObserver(scheduleDomChanged).observe(document.documentElement, { childList: true, subtree: true });
+    scheduleObserver = new MutationObserver(scheduleDomChanged);
+    scheduleObserver.observe(document.documentElement, { childList: true, subtree: true });
 }
+
+function stopScheduleTracking() {
+    clearInterval(scheduleIntervalId);
+    scheduleIntervalId = 0;
+    if (scheduleObserver) { scheduleObserver.disconnect(); scheduleObserver = null; }
+    clearTimeout(scheduleDomThrottle);
+    scheduleDomThrottle = 0;
+}
+
+// ---------- Безопасный режим: вход, выход, пересчёт ----------
+// Эти id и имена принадлежат расширению. Больше ничего на странице не удаляем.
+const SAFE_OWN_IDS = [
+    STYLE_TAG_ID, FONT_LINK_ID, SCHEDULE_STYLE_TAG_ID, CUSTOM_BLOCKS_STYLE_ID, BEHAVIOR_STYLE_ID,
+    SITE_BUILDER_FRAME_ID, BEHAVIOR_FRAME_ID, 'skymod-schedule-glow', 'skymod-toast',
+];
+
+function enterSafeMode() {
+    const root = document.documentElement;
+    // Не remove: antilock.js при отсутствии атрибута считает себя включённым.
+    root.setAttribute('data-skymod-antilock', '0');
+    // Сначала останавливаем наблюдателей, иначе они вернут снятое.
+    stopPageWatchers();
+    // Существующие выключатели функций: каждый снимает только то, что сам поставил.
+    setExternalLinkHandling(false);
+    setUiFade({});
+    applySiteBuilderFrame({ siteBuilderEnabled: false });
+    syncBehaviorParts(null);
+    clearOpaqueShells();
+    clearTimeout(uiFadeToastTimer);
+    // Свои элементы по точным id.
+    SAFE_OWN_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.remove(); });
+    // Свои блоки и метки на колонках сетки.
+    document.querySelectorAll('.' + CUSTOM_BLOCK_CLASS).forEach(el => el.remove());
+    document.querySelectorAll('[data-skymod-cb-sig]').forEach(el => el.removeAttribute('data-skymod-cb-sig'));
+    // Инлайн-переменные на <html> по именам, не очисткой style целиком.
+    COLOR_LAYERS.forEach(layer => root.style.removeProperty(layer + '-background-primary'));
+    root.style.removeProperty('--skymod-lesson-color');
+    root.style.removeProperty('--skymod-lesson-rgb');
+    if (root.getAttribute('style') === '') root.removeAttribute('style');
+    // Свои классы и атрибуты.
+    root.classList.remove('skymod-ui-faded', 'skymod-ui-faded-locked');
+    root.removeAttribute('data-skymod-diag-bodies');
+}
+
+// reapply: после выхода заново прочитать настройки и применить их. applyAll, из которого
+// выход случился (переключили тумблер), применит настройки сам и просит не дублировать.
+function leaveSafeMode(reapply) {
+    startPageWatchers();
+    try {
+        chrome.storage.local.get(['diagBodies'], r => {
+            if (!safeMode) document.documentElement.setAttribute('data-skymod-diag-bodies', r.diagBodies ? '1' : '0');
+        });
+        if (reapply) chrome.storage.local.get(SETTINGS_KEYS, applyAll);
+    } catch (e) { /* расширение перезагрузили, пока вкладка была открыта */ }
+}
+
+// Единственная точка, где решается, включён ли безопасный режим.
+function syncSafeMode(skipReapply) {
+    const want = safeToggle && SAFE_PATH_RE.test(location.pathname);
+    if (want === safeMode) return;
+    safeMode = want;
+    if (want) enterSafeMode();
+    else leaveSafeMode(!skipReapply);
+}
+
+// Angular меняет адрес без перезагрузки. history.pushState не патчим (из изолированного
+// мира вызовы сайта не видны, а в мире страницы это чужой глобальный объект), поэтому:
+// сообщение от background.js (webNavigation.onHistoryStateUpdated), popstate и опрос
+// раз в секунду, только чтение location.pathname. Адрес из сообщения не используется.
+setInterval(() => syncSafeMode(), 1000);
+window.addEventListener('popstate', () => syncSafeMode());
+chrome.runtime.onMessage.addListener((msg, sender) => {
+    if (msg && msg.type === 'skymod-url-changed' && sender.id === chrome.runtime.id) syncSafeMode();
+});
 
 function applyAll(settings) {
     lastSettings = settings || {};
+    safeToggle = lastSettings.safeModeOnTests !== false;
+    syncSafeMode(true);
+    // На странице теста ничего не применяем (см. enterSafeMode).
+    if (safeMode) return;
     syncBehaviorParts(lastSettings.sitePartsCss);
     document.documentElement.setAttribute('data-skymod-antilock', lastSettings.antiLockEnabled === false ? '0' : '1');
     // Разделено на независимые try/catch специально: если что-то одно
@@ -2283,10 +2448,11 @@ function applyAll(settings) {
 }
 
 chrome.storage.local.get(SETTINGS_KEYS, applyAll);
-initScheduleTracking();
-initCustomBlocks();
-initDiag();
-initBehavior();
+registerWatcher(startScheduleTracking, stopScheduleTracking);
+registerWatcher(startCustomBlocks, stopCustomBlocks);
+registerWatcher(startDiag, () => {});
+registerWatcher(startBehavior, stopBehavior);
+if (!safeMode) startPageWatchers();
 
 chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
@@ -2300,7 +2466,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
     // Расписание обновляет другая вкладка сайта: подхватываем и пересчитываем
     // только его, без повторного применения всей темы.
     if (changes.diagEnabled) diagEnabled = changes.diagEnabled.newValue !== false;
-    if (changes.diagBodies) document.documentElement.setAttribute('data-skymod-diag-bodies', changes.diagBodies.newValue ? '1' : '0');
+    if (changes.diagBodies && !safeMode) document.documentElement.setAttribute('data-skymod-diag-bodies', changes.diagBodies.newValue ? '1' : '0');
     if (changes[CUSTOM_BLOCKS_KEY]) {
         customBlocksCache = normalizeCustomBlocks(changes[CUSTOM_BLOCKS_KEY].newValue);
         renderCustomBlocks();

@@ -691,7 +691,7 @@ html.ui-animated .tab-btn.active { background-size: 200% 200%; animation: skymod
     border-radius: 50%; border: 1px solid var(--accent); color: var(--accent-light);
     font: 800 11px/1 'Manrope', system-ui, sans-serif; font-style: normal; cursor: help; vertical-align: middle;
 }
-.field-row:has(.lock-info) .field-label { display: inline-flex; align-items: center; flex: 0 1 auto; }
+.field-row:has(.lock-info, .hint-info) .field-label { display: inline-flex; align-items: center; flex: 0 1 auto; }
 .lock-info:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .lock-info .lock-tip {
     display: none; position: absolute; top: 26px; left: 0; right: 0; z-index: 20;
@@ -811,3 +811,27 @@ html.ui-animated .tab-btn.active { background-size: 200% 200%; animation: skymod
 /* Полоска забирает свою высоту у панели, поэтому общая высота попапа не меняется:
    в размере «xl» шапка, панель и вкладки и так упираются в предел 600px у попапов Chrome. */
 html.has-update-strip .panel { height: calc(var(--panel-h) - var(--update-strip-h)); }
+
+/* ============ Значок «i» с подсказкой настройки ============ */
+/* Серый, в отличие от акцентного .lock-info (блокировка конструктором). Подсказка
+   раскрывается на ширину поля под значком, а внизу панели открывается вверх (.up). */
+.field.has-hint-info { position: relative; }
+.hint-info {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 17px; height: 17px; margin-left: 6px; flex-shrink: 0;
+    border-radius: 50%; border: 1px solid var(--text-muted-3); color: var(--text-muted-2);
+    font: 800 11px/1 'Manrope', system-ui, sans-serif; font-style: normal; cursor: help; vertical-align: middle;
+}
+.lock-info + .hint-info { margin-left: 4px; }
+.hint-info:hover, .hint-info:focus { border-color: var(--accent); color: var(--accent-light); }
+.hint-info:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hint-info .hint-tip {
+    display: none; position: absolute; top: 26px; left: 0; right: 0; z-index: 20;
+    padding: 10px 12px; text-align: left;
+    background: var(--bg-elevated-2); border: 1px solid rgba(var(--accent-rgb), 0.35); border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .6);
+    font: 500 11.5px/1.5 'Manrope', system-ui, sans-serif; color: var(--text-muted); letter-spacing: 0;
+    text-transform: none; font-style: normal; cursor: default;
+}
+.hint-info:hover .hint-tip, .hint-info:focus .hint-tip, .hint-info:focus-within .hint-tip { display: block; }
+.hint-info.up .hint-tip { top: auto; bottom: calc(100% + 2px); }

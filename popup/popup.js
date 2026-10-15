@@ -237,8 +237,13 @@ const TABS = [
         id: 'comfort',
         label: 'Удобство',
         icon: ICONS.bolt,
+        compactHints: true, // длинные подсказки уходят под значок «i» (см. decorateHintInfo)
         fields: [
-            { type: 'section', label: 'Ссылки и трекеры' },
+            { type: 'section', label: 'Основное' },
+            {
+                key: 'safeModeOnTests', type: 'toggle', label: 'Безопасный режим на тестах', default: true,
+                hint: 'На страницах тестов расширение работает в минимальном режиме: тема и фон отключены, диагностика не ведётся. Кнопка «Следующее задание» на страницах обычных заданий работает как обычно. Если выключить, на тестах всё работает как обычно, кроме диагностики при прямом открытии страницы теста.',
+            },
             {
                 key: 'externalLinksNewTab', type: 'toggle', label: 'Внешние ссылки — в новой вкладке', default: true,
                 hint: 'Skyeng не закрывается, когда вы нажимаете на ссылку на другой сайт. Колёсико мыши и Ctrl+клик открывают вкладку в фоне.',
@@ -262,28 +267,11 @@ const TABS = [
             { key: 'hideNavSections', type: 'toggle', label: 'Убрать меню разделов', default: false, hint: 'Верхняя панель «Расписание, Предметы, Документы, Профиль». Переходить придётся по ссылкам.' },
             { key: 'hideBrandMark', type: 'toggle', label: 'Убрать значок слева в шапке', default: false },
 
-            { type: 'section', label: 'Блокировка при долгом отсутствии' },
+            { type: 'section', label: 'Защита от блокировки' },
             {
                 key: 'antiLockEnabled', type: 'toggle', label: 'Не давать сайту блокироваться', default: true,
                 hint: 'Сайт открывает окно «Страница заскучала» и перезагружается, если час нет click, pointermove, focus и scroll. Расширение раз в 3 минуты подаёт сайту один сигнал активности и просит Chrome не выгружать вкладку из памяти.',
             },
-
-            { type: 'section', label: 'Обновления' },
-            {
-                key: 'updateCheckEnabled', type: 'toggle', label: 'Проверять обновления', default: true,
-                hint: 'Раз в сутки расширение запрашивает у GitHub страницу последнего релиза и, если вышла версия новее, показывает значок ↑ на иконке и полоску в попапе. Ничего не скачивается и не устанавливается, кроме самого запроса ничего не отправляется.',
-            },
-
-            { type: 'section', label: 'Диагностика сайта' },
-            {
-                key: 'diagEnabled', type: 'toggle', label: 'Вести журнал диагностики', default: true,
-                hint: 'Расширение записывает в этом браузере запросы сайта, состояние вкладки и момент блокировки. Ничего никуда не отправляется: файл вы скачиваете сами.',
-            },
-            {
-                key: 'diagBodies', type: 'toggle', label: 'Сохранять фрагменты ответов и сообщений', default: false,
-                hint: 'Выключено: пишутся только адреса, коды ответов, размеры и имена полей JSON. Включено: ещё первые символы ответов и сообщений веб-сокета (токены, e-mail и телефоны маскируются, имена нет).',
-            },
-            { type: 'diagnostics' },
 
             { type: 'section', label: 'Режим «Только фон»' },
             {
@@ -307,6 +295,23 @@ const TABS = [
                     { value: 'all', text: 'На всех страницах сайта (в том числе на уроках)' },
                 ],
                 dependsOn: ['uiFadeIdleEnabled', 'uiFadeHotkeyEnabled'],
+            },
+
+            { type: 'section', label: 'Диагностика сайта' },
+            {
+                key: 'diagEnabled', type: 'toggle', label: 'Вести журнал диагностики', default: true,
+                hint: 'Расширение записывает в этом браузере запросы сайта, состояние вкладки и момент блокировки. Ничего никуда не отправляется: файл вы скачиваете сами.',
+            },
+            {
+                key: 'diagBodies', type: 'toggle', label: 'Сохранять фрагменты ответов и сообщений', default: false,
+                hint: 'Выключено: пишутся только адреса, коды ответов, размеры и имена полей JSON. Включено: ещё первые символы ответов и сообщений веб-сокета (токены, e-mail и телефоны маскируются, имена нет).',
+            },
+            { type: 'diagnostics' },
+
+            { type: 'section', label: 'Обновления' },
+            {
+                key: 'updateCheckEnabled', type: 'toggle', label: 'Проверять обновления', default: true,
+                hint: 'Раз в сутки расширение запрашивает у GitHub страницу последнего релиза и, если вышла версия новее, показывает значок ↑ на иконке и полоску в попапе. Ничего не скачивается и не устанавливается, кроме самого запроса ничего не отправляется.',
             },
         ],
     },
@@ -386,6 +391,14 @@ const TABS = [
         render: renderMoreTab,
     },
 ];
+
+// Вкладки с compactHints: подсказки длиннее порога уходят под значок «i»
+// (decorateHintInfo), короткие остаются текстом под настройкой.
+const HINT_INLINE_MAX = 60;
+TABS.forEach(tab => {
+    if (!tab.compactHints) return;
+    tab.fields.forEach(f => { if (f.hint && f.hint.length > HINT_INLINE_MAX) f.hintInfo = true; });
+});
 
 // Собираем defaults и полный список ключей автоматически из TABS —
 // работает и с плоскими `fields`, и со сворачиваемыми `groups`, не
@@ -867,11 +880,57 @@ function decorateLockedField(wrap, lock) {
     else wrap.prepend(info);
 }
 
+// Подсказка настройки под значком «i». Серый, чтобы не путать с акцентным значком
+// блокировки конструктором (lock-info): у заблокированной настройки сначала замок, потом этот.
+// Показывается по наведению и по фокусу (тап на сенсорном экране, Tab), закрывается потерей
+// фокуса (клик мимо), Esc и повторным кликом по значку.
+function placeHintTip(info) {
+    const panel = document.getElementById('panel');
+    const field = info.closest('.field');
+    const tip = info.querySelector('.hint-tip');
+    if (!panel || !field || !tip) return;
+    info.classList.remove('up');
+    const pr = panel.getBoundingClientRect();
+    const fr = field.getBoundingClientRect();
+    const below = pr.bottom - (fr.top + 26);
+    const above = fr.top - pr.top;
+    // Внизу панели места не хватает, а сверху больше: открываем вверх.
+    info.classList.toggle('up', tip.offsetHeight + 8 > below && above > below);
+}
+
+function decorateHintInfo(wrap) {
+    const hint = wrap.querySelector(':scope > .field-hint');
+    if (!hint) return;
+    const text = hint.textContent;
+    hint.remove();
+
+    const info = document.createElement('span');
+    info.className = 'hint-info';
+    info.tabIndex = 0;
+    info.setAttribute('role', 'note');
+    const tip = document.createElement('span');
+    tip.className = 'hint-tip';
+    tip.textContent = text;
+    info.append('i', tip);
+    info.addEventListener('mouseenter', () => placeHintTip(info));
+    info.addEventListener('focus', () => placeHintTip(info));
+    info.addEventListener('mousedown', e => {
+        if (document.activeElement === info) { e.preventDefault(); info.blur(); }
+    });
+    info.addEventListener('keydown', e => { if (e.key === 'Escape') info.blur(); });
+
+    const anchor = wrap.querySelector('.lock-info') || wrap.querySelector('.field-label');
+    if (anchor) anchor.after(info);
+    else wrap.prepend(info);
+    wrap.classList.add('has-hint-info');
+}
+
 function renderField(def, values) {
     const el = renderFieldBase(def, values);
     if (def.type === 'section' || !def.key) return el;
     const lock = computeLocks(currentValues || values)[def.key];
     if (lock) decorateLockedField(el, lock);
+    if (def.hintInfo) decorateHintInfo(el);
     return el;
 }
 

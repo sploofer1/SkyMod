@@ -17,6 +17,9 @@
  * data-skymod-diag-bodies="1". Адреса, токены, e-mail и телефоны маскируются.
  */
 (() => {
+    // Безопасный режим: на странице теста (/code/test/) хук не подключается вообще. Выход
+    // до метки и до любых обёрток; читается только location.pathname.
+    if (/^\/code\/test(\/|$)/.test(location.pathname)) return;
     if (window.__skymodDiagHook) return;
     window.__skymodDiagHook = true;
 
@@ -124,8 +127,15 @@
     const timerSeen = new Map();
     let timersDirty = false;
 
+    // Если страница стала тестовой уже после установки хука (Angular сменил адрес без
+    // перезагрузки), обёртки остаются на месте и просто пропускают вызовы, а запись и
+    // отправка журнала прекращаются. Проверка двусторонняя: на обычной странице всё
+    // возобновляется само.
+    const onTestPage = () => /^\/code\/test(\/|$)/.test(location.pathname);
+
     function flush() {
         flushTimer = 0;
+        if (onTestPage()) { pending = []; return; }
         const msg = {
             __skymodDiag: 1,
             entries: pending,
@@ -140,6 +150,7 @@
     }
 
     function push(entry) {
+        if (onTestPage()) return;
         entry.t = Date.now();
         pending.push(entry);
         if (pending.length > MAX_PENDING) pending.splice(0, pending.length - MAX_PENDING);
@@ -155,7 +166,7 @@
 
     function logTimer(kind, delay) {
         delay = Number(delay) || 0;
-        if (delay < 20000) return;
+        if (delay < 20000 || onTestPage()) return;
         const stack = stackTop(4);
         const key = kind + '|' + delay + '|' + stack;
         const seen = timerSeen.get(key);
