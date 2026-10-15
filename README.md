@@ -44,7 +44,7 @@ SkyMod превращает личный кабинет [avatar.skyeng.ru](https
 [![Демо SkyMod](docs/screenshots/builder-site.png)](ССЫЛКА_НА_ВИДЕО)
 -->
 
-<img src="docs/screenshots/builder-site.png" alt="Конструктор SkyMod в режиме «Сайт»" width="860">
+<img src="docs/screenshots/output.gif" alt="Демонстрация работы конструктора»" width="860">
 
 </div>
 
